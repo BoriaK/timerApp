@@ -4,6 +4,7 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
 from kivy.core.window import Window
+from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
@@ -366,9 +367,11 @@ class PresetsPopup(Popup):
         self.items = load_presets(view.presets_path)
         content = BoxLayout(orientation="vertical", spacing=10, padding=10)
 
-        save_row = BoxLayout(size_hint_y=None, height=52, spacing=8)
+        # dp (not raw pixels) so rows stay tall enough on high-density phone screens
+        save_row = BoxLayout(size_hint_y=None, height=dp(64), spacing=8)
         self.name_input = TextInput(hint_text="Name (optional)", multiline=False,
                                     write_tab=False, font_size="18sp",
+                                    padding=(dp(10), dp(22), dp(10), dp(10)),
                                     background_color=(0.15, 0.16, 0.2, 1),
                                     foreground_color=(1, 1, 1, 1),
                                     hint_text_color=(0.6, 0.6, 0.65, 1),
@@ -385,7 +388,7 @@ class PresetsPopup(Popup):
         scroll.add_widget(self.list)
         content.add_widget(scroll)
 
-        content.add_widget(Button(text="Close", size_hint_y=None, height=52,
+        content.add_widget(Button(text="Close", size_hint_y=None, height=dp(56),
                                   on_release=lambda *_: self.dismiss()))
         super().__init__(title="Presets", content=content, size_hint=(0.94, 0.85),
                          **kwargs)
@@ -395,12 +398,13 @@ class PresetsPopup(Popup):
         self.list.clear_widgets()
         if not self.items:
             self.list.add_widget(Label(text="No saved presets yet", size_hint_y=None,
-                                       height=60, color=(0.7, 0.7, 0.75, 1)))
+                                       height=dp(60), color=(0.7, 0.7, 0.75, 1)))
         for preset in self.items:
-            row = BoxLayout(size_hint_y=None, height=64, spacing=6)
+            row = BoxLayout(size_hint_y=None, height=dp(88), spacing=6)
             row.add_widget(Button(
                 text=f"{preset['name']}\n[size=14sp]{describe(preset)}[/size]",
-                markup=True, halign="center",
+                markup=True, halign="center", valign="middle", font_size="18sp",
+                on_size=lambda b, size: setattr(b, "text_size", (size[0] - dp(16), size[1])),
                 on_release=lambda _b, p=preset: self.load(p)))
             row.add_widget(Button(
                 text="X", size_hint_x=0.18, background_color=(0.8, 0.3, 0.3, 1),
