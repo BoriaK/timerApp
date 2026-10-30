@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Buildozer / python-for-android build output
+.buildozer/
+bin/
+*.apk
+*.aab
+
+# Kivy logs
+.kivy/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
