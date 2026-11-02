@@ -247,6 +247,7 @@ class SimpleTimerView(BoxLayout):
         if finished:
             beeper.long()
             beeper.finished()
+            self.timer.reset()  # back to the time that was set
         if self.timer.running or finished:
             self.refresh(force=True)
 
@@ -533,6 +534,8 @@ class IntervalView(BoxLayout):
             beeper.long()
             if event == "done":
                 beeper.finished()
+                self.reset()  # back to the setup screen
+                return
         self.refresh()
 
     def refresh(self):
