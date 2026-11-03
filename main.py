@@ -32,6 +32,8 @@ PHASE_COLORS = {
     "done": (0.5, 0.75, 1.0, 1),
 }
 
+FINISHED_SCREEN_SECONDS = 1  # how long "WORKOUT FINISHED" shows before returning to setup
+
 # label -> seconds. Edit this to change the presets.
 PRESETS = {
     "30 sec": 30,
@@ -461,6 +463,12 @@ class IntervalView(BoxLayout):
         for w in (self.status, self.round_label, self.time_label, self.next_label):
             self.run_panel.add_widget(w)
 
+        self.finished_panel = BoxLayout()
+        self.finished_panel.add_widget(Label(
+            text="WORKOUT\nFINISHED", font_size="56sp", bold=True, halign="center",
+            color=PHASE_COLORS["done"]))
+        self._finish_event = None
+
         self.body = BoxLayout(size_hint_y=0.7)
         self.body.add_widget(self.setup_panel)
         self.add_widget(self.body)
@@ -501,18 +509,27 @@ class IntervalView(BoxLayout):
         self.in_session = True
         self.show(self.run_panel)
 
+    def _cancel_finish(self):
+        if self._finish_event:
+            self._finish_event.cancel()
+            self._finish_event = None
+
     def toggle(self, *_):
+        self._cancel_finish()
         if self.interval.running:
             self.interval.pause()
             beeper.cancel()
         else:
             if not self.in_session:
                 self.begin()
+            elif self.interval.done:
+                self.show(self.run_panel)  # restarting from the finished screen
             self.interval.start()
             beeper.begin(self.interval.remaining_phases())
         self.refresh()
 
     def reset(self, *_):
+        self._cancel_finish()
         self.interval.reset()
         beeper.cancel()
         self.in_session = False
@@ -534,8 +551,8 @@ class IntervalView(BoxLayout):
             beeper.long()
             if event == "done":
                 beeper.finished()
-                self.reset()  # back to the setup screen
-                return
+                self.show(self.finished_panel)
+                self._finish_event = Clock.schedule_once(self.reset, FINISHED_SCREEN_SECONDS)
         self.refresh()
 
     def refresh(self):

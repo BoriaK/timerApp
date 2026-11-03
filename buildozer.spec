@@ -5,7 +5,7 @@ package.domain = org.example
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,wav
 source.exclude_patterns = test_*.py
-version = 0.2
+version = 0.3
 requirements = python3,kivy,pyjnius,android,charset_normalizer==3.4.4
 orientation = portrait
 fullscreen = 0
