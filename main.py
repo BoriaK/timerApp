@@ -17,6 +17,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 
 import background
+from last_used import load_last_used, save_last_used
 from presets import add_preset, delete_preset, describe, load_presets, save_presets
 from settings import load_settings, save_settings
 from timer_logic import (MAX_SECONDS, CountdownTimer, IntervalTimer, format_time,
@@ -24,6 +25,9 @@ from timer_logic import (MAX_SECONDS, CountdownTimer, IntervalTimer, format_time
 
 # Work/Rest defaults: work seconds, rest seconds, rounds
 DEFAULT_INTERVAL = (40, 20, 5)
+DEFAULT_TIMER = 300
+LAST_USED_DEFAULTS = {"timer": DEFAULT_TIMER, "work": DEFAULT_INTERVAL[0],
+                      "rest": DEFAULT_INTERVAL[1], "rounds": DEFAULT_INTERVAL[2]}
 ADJUST_BUTTONS = (("-1 min", -60), ("+1 min", 60), ("-1 sec", -1), ("+1 sec", 1))
 MAX_ROUNDS = 99
 PHASE_COLORS = {
@@ -154,10 +158,11 @@ def labeled(widget, caption):
 
 
 class SimpleTimerView(BoxLayout):
-    def __init__(self, **kwargs):
+    def __init__(self, seconds=DEFAULT_TIMER, on_use=lambda values: None, **kwargs):
         super().__init__(orientation="vertical", spacing=14, **kwargs)
+        self.on_use = on_use
         self.timer = CountdownTimer()
-        self.timer.set_duration(300)
+        self.timer.set_duration(min(MAX_SECONDS, seconds))
 
         self.min_field = TimeField()
         self.sec_field = TimeField()
@@ -229,6 +234,7 @@ class SimpleTimerView(BoxLayout):
             self.commit()
             self.timer.start()
             if self.timer.running:
+                self.on_use({"timer": int(self.timer.duration)})
                 beeper.begin(self.timer.remaining_phases())
         self.refresh(force=True)
 
@@ -436,10 +442,12 @@ class PresetsPopup(Popup):
 class IntervalView(BoxLayout):
     """Work/Rest cycle: set it up, press Start, then it runs by itself."""
 
-    def __init__(self, presets_path, **kwargs):
+    def __init__(self, presets_path, setup=DEFAULT_INTERVAL,
+                 on_use=lambda values: None, **kwargs):
         super().__init__(orientation="vertical", spacing=14, **kwargs)
         self.presets_path = presets_path
-        self.interval = IntervalTimer(*DEFAULT_INTERVAL)
+        self.on_use = on_use
+        self.interval = IntervalTimer(*setup)
         self.in_session = False
 
         self.work_row = DurationBlock("WORK", self.interval.work, PHASE_COLORS["work"],
@@ -506,6 +514,8 @@ class IntervalView(BoxLayout):
         self.interval.configure(self.work_row.value, self.rest_row.value,
                                 self.rounds_row.value)
         self.work_row.value = self.interval.work  # work can't be 0
+        self.on_use({"work": self.interval.work, "rest": self.interval.rest,
+                     "rounds": self.interval.rounds})
         self.in_session = True
         self.show(self.run_panel)
 
@@ -615,10 +625,13 @@ class SettingsView(BoxLayout):
 class TimerRoot(BoxLayout):
     """Top-level screen: a 'Timer | Work / Rest | Settings' switch above the active view."""
 
-    def __init__(self, settings, on_settings_change, presets_path, **kwargs):
+    def __init__(self, settings, on_settings_change, presets_path,
+                 last_used, on_use, **kwargs):
         super().__init__(orientation="vertical", padding=16, spacing=12, **kwargs)
-        self.simple = SimpleTimerView()
-        self.interval_view = IntervalView(presets_path)
+        self.simple = SimpleTimerView(last_used["timer"], on_use)
+        self.interval_view = IntervalView(
+            presets_path, (last_used["work"], last_used["rest"], last_used["rounds"]),
+            on_use)
         self.settings_view = SettingsView(settings, on_settings_change)
         self.views = {"Timer": self.simple, "Work / Rest": self.interval_view,
                       "Settings": self.settings_view}
@@ -654,8 +667,16 @@ class TimerApp(App):
         settings = load_settings(self.settings_path)
         self.apply_settings(settings, save=False)
         background.stop()  # drop any beeps left over from a previous run
+        self.last_used_path = Path(self.user_data_dir) / "last_used.json"
+        self.last_used = load_last_used(self.last_used_path, LAST_USED_DEFAULTS)
         return TimerRoot(settings, self.apply_settings,
-                         Path(self.user_data_dir) / "presets.json")
+                         Path(self.user_data_dir) / "presets.json",
+                         self.last_used, self.remember)
+
+    def remember(self, values):
+        """Store the values just started, so the next launch begins with them."""
+        self.last_used.update(values)
+        save_last_used(self.last_used_path, self.last_used)
 
     def apply_settings(self, settings, save=True):
         beeper.background_enabled = settings["background"]
